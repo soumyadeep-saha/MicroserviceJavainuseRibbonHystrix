@@ -1,0 +1,286 @@
+MicroserviceJavainuseRibbonHystrix
+
+We make use of Netflix Hystrix for fault tolerance.
+
+What is Netflix Hystrix? Need for it?
+Hystrix is a latency and fault tolerance library designed to isolate points of access to remote systems, services and 3rd party libraries, stop cascading failure and enable resilience in complex distributed systems where failure is inevitable.
+
+Usually for systems developed using Microservices architecture, there are many microservices involved. These microservices collaborate with each other.
+
+Suppose there are 9 microservices, if the microservice 9 is failed, then using the traditional approach we will propagate an exception. But this will still cause the whole system to crash anyways.
+This problem gets more complex as the number of microservices increase. The number of microservices can be as high as 1000. This is where hystrix comes into picture-
+We will be using two features of Hystrix-
+Fallback method
+Circuit Breaker
+
+Fallback is similar as try-catch block
+The return type of fallback method should be same as the return type of actual method where we are applying @HystrixCommand
+
+In this post we will have a look at Hsytrix Fallback method. In next post we will have implement the Hystrix Circuit Breaker.
+
+In previous posts we had two services- employee-consumer consuming the service exposed by the employee-producer.
+
+Now suppose due to some reason the employee-producer exposed service throws an exception. In this case using Hystrix we define a fallback method. This fallback method should have the same return type as the exposed service. In case of exception in the exposed service the fallback method will return some value.
+
+
+In producer
+Modify the employee-producer pom.xml to include the spring cloud hystrix starter dependency
+<dependency>
+	<groupId>org.springframework.cloud</groupId>
+	<artifactId>spring-cloud-starter-hystrix</artifactId>
+</dependency>
+
+In the main class add the EnableHystrix syntax
+@SpringBootApplication
+@EnableCircuitBreaker
+@EnableDiscoveryClient
+public class EmployeeProducerApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(EmployeeProducerApplication.class, args);
+	}
+
+}
+
+
+In the controller TestController.java
+@RestController
+public class EmployeeController {
+
+	@RequestMapping(value = "/employee", method = RequestMethod.GET)
+	@HystrixCommand(fallbackMethod = "getDataFallback")
+	public Employee firstPage() {
+
+		Employee employee = new Employee();
+		employee.setName("soumyadeep1");
+		employee.setDesignation("Director Technology");
+		employee.setEmpId("1");
+		employee.setAddress("Bangalore");
+
+		if (employee.getEmpId().equalsIgnoreCase("1")) {
+
+			throw new RuntimeException();
+		}
+
+		return employee;
+	}
+
+	public Employee getDataFallback() {
+
+		Employee employee = new Employee();
+		employee.setName("fallback-soumyadeep1");
+		employee.setDesignation("fallback-Director Technology");
+		employee.setEmpId("fallback-1");
+		employee.setAddress("fallback-Bangalore");
+
+		return employee;
+	}
+}
+
+
+In properties file no change
+server.port=8092
+#server.port=8082
+eureka.client.serviceUrl.defaultZone=http://localhost:8761/eureka
+spring.application.name=employee-producer
+eureka.instance.instanceId=${spring.application.name}:${random.value}
+
+Next start the Eureka server, employee-producer, employee-consumer modules. When we start the employee-consumer, the service exposed by the employee-producer gets called.
+
+In the employee-consumer console we will see that the Employee object created in the fallback method of TestController class of employee-producer.
+
+
+
+Spring Cloud- Netflix Eureka + Ribbon + Hystrix Simple Example
+
+
+In this post we make use of Netflix Hystrix for fault tolerance.
+In a previous post we had implemented Load Balancing using Spring Cloud- Netflix Eureka + Ribbon. 
+
+Spring Cloud - Table Of Contents
+
+
+Microservice Registration and Discovery with Spring cloud using Netflix Eureka- Part 1.
+Microservice Registration and Discovery with Spring cloud using Netflix Eureka - Part 2.
+Microservice Registration and Discovery with Spring cloud using Netflix Eureka - Part 3.
+Microservice Registration and Discovery with Spring cloud using Netflix Eureka - Part 4.
+Spring Cloud- Netflix Eureka + Ribbon Simple Example
+Spring Cloud- Netflix Eureka + Ribbon + Hystrix Fallback Simple Example
+Spring Cloud- Netflix Hystrix Circuit Breaker Simple Example
+Spring Cloud- Netflix Feign REST Client Simple Example
+Spring Cloud- Netflix Zuul +Eureka Simple Example
+Spring Cloud Config Server using Native Mode Simple Example
+Spring Cloud Config Server Using Git Simple Example
+Spring Boot Admin Simple Example
+Spring Cloud Stream Tutorial - Publish Message to RabbitMQ Simple Example
+Spring Cloud Stream Tutorial - Consume Message from RabbitMQ Simple Example
+Spring Cloud Tutorial - Publish Events Using Spring Cloud Bus
+Spring Cloud Tutorial - Stream Processing Using Spring Cloud Data Flow
+What is Netflix Hystrix? Need for it?
+
+Hystrix is a latency and fault tolerance library designed to isolate points of access to remote systems, services and 3rd party libraries, stop cascading failure and enable resilience in complex distributed systems where failure is inevitable.
+Usually for systems developed using Microservices architecture, there are many microservices involved. These microservices collaborate with each other.
+Consider the following microservices-
+
+ 
+Suppose if the microservice 9 in the above diagram failed, then using the traditional approach we will propagate an exception. But this will still cause the whole system to crash anyways.
+This problem gets more complex as the number of microservices increase. The number of microservices can be as high as 1000. This is where hystrix comes into picture-
+We will be using two features of Hystrix-
+Fallback method
+Circuit Breaker
+In this post we will have a look at Hsytrix Fallback method. In next post we will have implement the Hystrix Circuit Breaker.
+
+In previous posts we had two services- employee-consumer consuming the service exposed by the employee-producer.
+The simplified diagram is as below-
+
+Now suppose due to some reason the employee-producer exposed service throws an exception. In this case using Hystrix we define a fallback method. This fallback method should have the same return type as the exposed service. In case of exception in the exposed service the fallback method will return some value.
+Video
+
+This tutorial is explained in the below Youtube Video.
+
+
+Lets Begin-
+
+Modify the employee-producer pom.xml to include the spring cloud hystrix starter dependency
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>com.javainuse</groupId>
+	<artifactId>employee-consumer</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<packaging>jar</packaging>
+
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>1.4.1.RELEASE</version>
+		<relativePath /> <!-- lookup parent from repository -->
+	</parent>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<java.version>1.8</java.version>
+	</properties>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-eureka</artifactId>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-hystrix</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+	</dependencies>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>Camden.SR6</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+
+</project>
+
+
+ 
+Next modify the SpringBootHelloWorldApplication code to add the EnableHystrix syntax
+package com.javainuse;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.circuitbreaker.EnableCircuitBreaker;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
+
+@SpringBootApplication
+@EnableCircuitBreaker
+@EnableDiscoveryClient
+public class SpringBootHelloWorldApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(SpringBootHelloWorldApplication.class, args);
+	}
+}
+
+
+Next we modify the TestController.java to add the fallback method.
+
+package com.javainuse.controllers;
+
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.javainuse.model.Employee;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+
+@RestController
+public class TestController {
+
+	@RequestMapping(value = "/employee", method = RequestMethod.GET)
+	@HystrixCommand(fallbackMethod = "getDataFallBack")
+	public Employee firstPage() {
+
+		Employee emp = new Employee();
+		emp.setName("emp1");
+		emp.setDesignation("manager");
+		emp.setEmpId("1");
+		emp.setSalary(3000);
+		
+		if(emp.getName().equalsIgnoreCase("emp1"))
+			throw new RuntimeException();
+
+		return emp;
+	}
+
+	public Employee getDataFallBack() {
+		
+		Employee emp = new Employee();
+		emp.setName("fallback-emp1");
+		emp.setDesignation("fallback-manager");
+		emp.setEmpId("fallback-1");
+		emp.setSalary(3000);
+
+		return emp;
+		
+	}
+	
+}
+
+
+ 
+Next start the Eureka server, employee-producer, employee-consumer modules. When we start the employee-consumer, the service exposed by the employee-producer gets called.
+In the employee-consumer console we will see that the Employee object created in the fallback method of TestController class of employee-producer.
+Download Source Code
+Download it -
+Employee Producer Service with Hystix code
+Employee Consumer Service
+Eureka Service
+
+
+
+
+
+

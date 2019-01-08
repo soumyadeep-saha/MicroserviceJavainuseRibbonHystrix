@@ -1,0 +1,344 @@
+MicroserviceJavainuseRegistrationAll
+Microservice Registration with Spring cloud using Netflix Eureka
+
+Previously we developed microservices using Spring Boot. These were all stand alone applications. But suppose we now have to connect the various applications and build a distributed system.
+
+Why Spring cloud is required?
+
+When developing distributed microservices with Spring Boot we face the following issues-
+Complexity associated with distributed systems-
+This overhead includes network issues, Latency overhead, Bandwidth issues, security issues.
+Service Discovery-
+Service discovery tools manage how processes and services in a cluster can find and talk to one another. It involves a directory of services, registering services in that directory, and then being able to lookup and connect to services in that directory.
+Redundancy-
+Redundancy issues in distributed systems.
+Loadbalancing-
+Load balancing improves the distribution of workloads across multiple computing resources, such as computers, a computer cluster, network links, central processing units, or disk drives.
+Performance issues-
+Performance issues due to various operational overheads.
+Deployment complexities-
+Requirement of Devops skills.
+
+MicroserviceJavainuseRegistration-1
+Overview of Netflix components.
+
+Netflix provides various components which are used for deployment of Spring Boot Microservices. Eureka is one of the components, it is used for Service Registry and Discovery.
+Consumer will use the RestTemplate to consume the Rest service exposed by the producer.
+Initially the location of producer will be hardcoded in consumer, but later it will be registered in Eureka to remove the hardcoding.
+
+
+
+When we start a project, we usally have all the configurations in the properties file.
+As more and more services are developed and deployed, adding and modifying these properties become more complex. Some services might go down, while some the location might change. This manual changing of properties may create issues.
+
+Eureka Service Registration and Discovery helps in such scenarios. As all services are registered to the Eureka server and lookup done by calling the Eureka Server, any change in service locations need not be handled and is taken care of
+This Post is divided into 4 parts-
+a.) Overview of Netflix components.
+b.) Develop an Employee service to produce and consume REST API using Spring Boot.
+c.) Use Eureka for Service Registration(only producer will be registered in Eureka)
+d.) Use Eureka for Service Discovery(both producer and consumer will be registered in Eureka, consumer will consume producer through Eureka, if location of producer changes, no need to change in consumer as it will fetch it from Eureka)
+
+Overview of Netflix components-
+Spring Cloud Netflix provides Netflix OSS integrations for Spring Boot apps through autoconfiguration and binding to the Spring Environment and other Spring programming model idioms. With a few simple annotations you can quickly enable and configure the common patterns inside your application and build large distributed systems with battle-tested Netflix components. The patterns provided include Service Discovery (Eureka), Circuit Breaker (Hystrix), Intelligent Routing (Zuul) and Client Side Load Balancing (Ribbon).
+
+Service Discovery (Eureka)
+Circuit Breaker (Hystrix)
+Intelligent Routing (Zuul)
+Client Side Load Balancing (Ribbon)
+
+Eureka->	Service Registration and Discovery
+Ribbon-> Dynamic Routing and Load Balancer
+Hystrix->	Circuit Breaker
+Zuul-> Edge Server
+
+
+
+MicroserviceJavainuseRegistration-2
+Develop an Employee service to produce and consume REST API using Spring Boot
+
+In this post we develop 2 spring boot microservices named as employee-producer and employee-consumer.
+As the name suggests employee-producer will be exposing REST APIs which will be consumed by the employee-consumer.
+Employee-Consumer -> consume service -> Employee-Producer
+
+Develop employee-producer as follows-
+Add dependency
+spring-boot-starter-web
+
+Create model Employee
+public class Employee {
+	private String empId;
+	private String name;
+	private String designation;
+	private String address;
+
+Create controller EmployeeController
+@RestController
+public class EmployeeController {
+	
+	@RequestMapping(value = "/employee", method = RequestMethod.GET)
+	public Employee firstPage() {
+
+		Employee employee = new Employee();
+		employee.setName("soumyadeep1");
+		employee.setDesignation("Director Technology");
+		employee.setEmpId("1");
+		employee.setAddress("Bangalore");
+
+		return employee;
+	}
+}
+	
+Create main class
+
+server.port=8092
+
+Go to http://localhost:8092/employee
+
+Develop employee-consumer as follows-
+Add dependency
+spring-boot-starter-web
+
+Create controllerclient ConsumerControllerClient
+
+@Controller
+public class ConsumerControllerClient {
+
+	@Autowired
+	private DiscoveryClient discoveryClient;
+
+	public void getEmployee() {
+
+		String baseUrl="http://localhost:8092/employee";
+		
+		RestTemplate restTemplate = new RestTemplate();
+		ResponseEntity<String> response = null;
+		try {
+			response = restTemplate.exchange(baseUrl, HttpMethod.GET, getHeaders(), String.class);
+		} catch (Exception e) {
+			System.out.println(e);
+		}
+
+		System.out.println(response.getBody());
+		System.out.println(response.getStatusCodeValue());
+	}
+
+	private static HttpEntity<?> getHeaders() throws IOException {
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.add("Accept", MediaType.APPLICATION_JSON_VALUE);
+		return new HttpEntity<>(headers);
+	}
+}
+
+
+Create main class
+@SpringBootApplication
+public class EmployeeConsumerApplication {
+
+	public static void main(String[] args) {
+		ApplicationContext ctx=SpringApplication.run(EmployeeConsumerApplication.class, args);
+		
+		ConsumerControllerClient consumerControllerClient=ctx.getBean(ConsumerControllerClient.class);
+		
+		System.out.println(consumerControllerClient);
+		
+		consumerControllerClient.getEmployee();
+	}
+	
+	@Bean
+	public ConsumerControllerClient consumerControllerClient() {
+		
+		return new ConsumerControllerClient();
+	}
+
+}
+
+server.port=8091
+
+Running the Rest Client we get the output
+
+
+
+MicroserviceJavainuseRegistration-3
+Use Eureka for Service Registration(only producer will be registered in Eureka)
+
+if NoSuchBeanDefinitionException: No qualifying bean of type 'javax.servlet.Filter' occurs, then delete, m2 repository and try again or try the below in main class
+@Bean
+public Filter webRequestLoggingFilter() {
+    return new CommonsRequestLoggingFilter();
+}
+
+consumer -> producer -> eureka service registry
+
+when the changes are done and the application server is started, we will get error as no services/instances are registered initially
+
+Develop the Eureka server Service as follows-
+Add dependency
+<dependency>
+	<groupId>org.springframework.cloud</groupId>
+	<artifactId>spring-cloud-starter-eureka-server</artifactId>
+</dependency>tId>spring-cloud-starter-eureka-server</artifactId>
+</dependency>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
+Create main class with annotations @SpringBootApplication and @EnableEurekaServer
+@SpringBootApplication
+@EnableEurekaServer
+public class EurekaServerApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(EurekaServerApplication.class, args);
+	}
+
+}
+
+
+
+Finally specify the port on which the eureka application will get started -
+Next define the batch configuration for creating the tasklet as follows-
+server.port=8761
+
+Run this as java application. Go to URL-
+http://localhost:8761/
+We can see the Eureka Server page as follows-
+
+Next we modify the employee-producer module we defined previously to register to the Eureka server.
+Add the Spring cloud dependencies to the pom.xml as follows-
+<dependency>
+	<groupId>org.springframework.cloud</groupId>
+	<artifactId>spring-cloud-starter-eureka</artifactId>
+</dependency>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+<properties>
+	<java.version>1.8</java.version>
+	<spring-cloud.version>Edgware.SR5</spring-cloud.version>
+</properties>
+
+Create main class with annotations @SpringBootApplication and @EnableDiscoveryClient
+@SpringBootApplication
+@EnableDiscoveryClient
+public class EmployeeProducerApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(EmployeeProducerApplication.class, args);
+	}
+}
+
+
+In the application.properties specify the url on which the Eureka server is up and running.
+server.port=8092
+eureka.client.serviceUrl.defaultZone=http://localhost:8761/eureka
+
+Now start this employee-producer by running this as a Java Application and go to url.
+http://localhost:8092/
+We can see the Eureka Server page with the employee-producer module registered
+We can see here that the registered application name is coming as UNKNOWN. To change this create in resources a file named bootstrap.properties
+spring.application.name=employee-producer
+
+
+
+MicroserviceJavainuseRegistration-4
+Use Eureka for Service Discovery(both producer and consumer will be registered in Eureka, consumer will consume producer through Eureka, if location of producer changes, no need to change in consumer as it will fetch it from Eureka)
+This post we consume this service by discovering the employee-producer service from the Eureka server.
+
+No tight coupling between services/instances, only loose coupling is there
+
+We need to Autowire DiscoveryClient which is provided by Spring cloud library
+
+
+
+
+
+producer -> eureka service registry
+consumer -> eureka service discovery
+consumer -> eureka service registry(producer is there in eureka)
+
+Modify the employee-consumer service as follows-
+Modify the pom.xml with spring cloud dependencies as follows-
+
+<dependency>
+	<groupId>org.springframework.cloud</groupId>
+	<artifactId>spring-cloud-starter-eureka</artifactId>
+</dependency>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-dependencies</artifactId>
+				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+<properties>
+	<java.version>1.8</java.version>
+	<spring-cloud.version>Edgware.SR5</spring-cloud.version>
+</properties>
+
+
+Create controller ConsumerControllerClient
+@Controller
+public class ConsumerControllerClient {
+
+	@Autowired
+	private DiscoveryClient discoveryClient;
+
+	public void getEmployee() {
+
+		// String baseUrl="http://localhost:8092/employee";
+		
+		List<ServiceInstance> instances = discoveryClient.getInstances("employee-producer");
+		ServiceInstance serviceInstance = instances.get(0);
+		String baseUrl = serviceInstance.getUri().toString();
+		baseUrl = baseUrl + "/employee";
+		
+		RestTemplate restTemplate = new RestTemplate();
+		ResponseEntity<String> response = null;
+		try {
+			response = restTemplate.exchange(baseUrl, HttpMethod.GET, getHeaders(), String.class);
+		} catch (Exception e) {
+			System.out.println(e);
+		}
+
+		System.out.println(response.getBody());
+		System.out.println(response.getStatusCodeValue());
+	}
+
+	private static HttpEntity<?> getHeaders() throws IOException {
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.add("Accept", MediaType.APPLICATION_JSON_VALUE);
+		return new HttpEntity<>(headers);
+	}
+}
+
+
+Modify the application.properties to include the eureka server url-
+server.port=8091
+eureka.client.serviceUrl.defaultZone=http://localhost:8761/eureka
+
+Add the bootstrap.properties as follows-
+spring.application.name=employee-consumer
+
+Run this as java application. We can see the the employee-producer is successfully consumed
